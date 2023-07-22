@@ -1,5 +1,5 @@
 common:
-    model:
+    model_t:
         name: votenet
         task_type: Scannetv2
         net_type: detr
@@ -24,6 +24,15 @@ common:
             dropout: 0.1
             nheads: 8
             pre_norm: False
+    model:
+        name: votenet
+        task_type: Scannetv2
+        net_type: votenet
+        loss_type: NMS
+        num_input_channel: 0
+        num_target: 256
+        vote_factor: 1
+        cluster_sampling: vote_fps
         loss_weight:
             loss_weight:
                 center_loss: 1
@@ -31,7 +40,7 @@ common:
                 heading_residual_loss: 1
                 size_class_loss: 0.1
                 size_residual_loss: 1
-                no_vote_loss: 1
+                # no_vote_loss: 0
 
                 vote_loss: 1
                 objectness_loss: 0.5
@@ -39,6 +48,7 @@ common:
                 sem_cls_loss: 0.1
 
                 all_weight: 10
+                
     logs:
         base_logger:
             path: log/log.txt
@@ -47,20 +57,17 @@ common:
     snapshot:
         save_path: snapshot
     load:
-        load: False
-        path: ./ckpt_best_model.pth.tar
-        type: recover
+        load: True
+        path: ./best_teacher.pth.tar
+        type: test
 train:
     batch_size: 8
     workers: 4
     dataset:
         name: Scannetv2
         split_set: train
-        # data_path: C:\Users\ZLC\Desktop\pycodes\data\scannet_train_detection_data
-        # data_path: /data1/zhaolichen/data/scannet_train_detection_data
-        # data_path: /home/yuanze/data/scannet_train_detection_data
         data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
-        # data_path: /mnt/lustre/liujie4/big/scannet_train_detection_data
+        # data_path: /home/yuanze/data/scannet_train_detection_data
         num_points: 40000
         augment: True
         # use_color: True
@@ -73,17 +80,17 @@ train:
         weight_decay: 0.000001
     lr_scheduler:
         type: cosine
-        T_max: 100000
+        T_max: 27180
         base_lr: 0.005
         eta_min: 0.00001
     transform: None # TODO
     runner:
-        name: iteration
-        max_iter: 100000
+        name: distill
+        max_iter: 27180 # 180 * 1201 / 8
         # test and save
         # test_freq: 1600
-        test_freq: 1000
-        save_freq: 100000
+        test_freq: 151
+        save_freq: 27180
         log_freq: 10
         snapshot_save_path: snapshot
     params_weight_dict:
@@ -98,11 +105,7 @@ test:
         valset:
             name: Scannetv2
             split_set: val
-            # data_path: C:\Users\ZLC\Desktop\pycodes\data\scannet_train_detection_data
-            # data_path: /data1/zhaolichen/data/scannet_train_detection_data
-            # data_path: /mnt/lustre/liujie4/big/scannet_train_detection_data
             data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
-            # data_path: /home/yuanze/data/scannet_train_detection_data
             num_points: 40000
             # use_color: True
             # use_height: True  # use it as feature

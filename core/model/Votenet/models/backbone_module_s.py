@@ -29,14 +29,14 @@ class Pointnet2Backbone(nn.Module):
             Number of input channels in the feature descriptor for each point.
             e.g. 3 for RGB.
     """
-    def __init__(self, input_feature_dim=0):
+    def __init__(self, input_feature_dim=0, scale_factor=2):
         super().__init__()
 
         self.sa1 = PointnetSAModuleVotes(
                 npoint=2048,
                 radius=0.2,
                 nsample=64,
-                mlp=[input_feature_dim, 64, 64, 128],
+                mlp=[input_feature_dim, 64//scale_factor, 64//scale_factor, 128//scale_factor],
                 use_xyz=True,
                 normalize_xyz=True
             )
@@ -45,7 +45,7 @@ class Pointnet2Backbone(nn.Module):
                 npoint=1024,
                 radius=0.4,
                 nsample=32,
-                mlp=[128, 128, 128, 256],
+                mlp=[128//scale_factor, 128//scale_factor, 128//scale_factor, 256//scale_factor],
                 use_xyz=True,
                 normalize_xyz=True
             )
@@ -54,7 +54,7 @@ class Pointnet2Backbone(nn.Module):
                 npoint=512,
                 radius=0.8,
                 nsample=16,
-                mlp=[256, 128, 128, 256],
+                mlp=[256//scale_factor, 128//scale_factor, 128//scale_factor, 256//scale_factor],
                 use_xyz=True,
                 normalize_xyz=True
             )
@@ -63,13 +63,13 @@ class Pointnet2Backbone(nn.Module):
                 npoint=256,
                 radius=1.2,
                 nsample=16,
-                mlp=[256, 128, 128, 256],
+                mlp=[256//scale_factor, 128//scale_factor, 128//scale_factor, 256//scale_factor],
                 use_xyz=True,
                 normalize_xyz=True
             )
 
-        self.fp1 = PointnetFPModule(mlp=[256+256,256,256])
-        self.fp2 = PointnetFPModule(mlp=[256+256,256,256])
+        self.fp1 = PointnetFPModule(mlp=[(256+256)//scale_factor,256//scale_factor,256//scale_factor])
+        self.fp2 = PointnetFPModule(mlp=[(256+256)//scale_factor,256//scale_factor,256//scale_factor])
 
     def _break_up_pc(self, pc):
         xyz = pc[..., 0:3].contiguous()
@@ -80,7 +80,7 @@ class Pointnet2Backbone(nn.Module):
 
         return xyz, features
 
-    def forward(self, pointcloud: torch.cuda.FloatTensor, end_points=None):
+    def forward(self, pointcloud: torch.cuda.FloatTensor, end_points=None, end_points_t=None, masked_ind_list=None):
         r"""
             Forward pass of the network
 
@@ -103,25 +103,32 @@ class Pointnet2Backbone(nn.Module):
         batch_size = pointcloud.shape[0]
 
         xyz, features = self._break_up_pc(pointcloud)
-
-        # --------- 4 SET ABSTRACTION LAYERS ---------
-        xyz, features, fps_inds = self.sa1(xyz, features)
+        if end_points_t==None:
+            xyz, features, fps_inds = self.sa1(xyz, features)
+        else:
+            xyz, features, fps_inds = self.sa1(xyz, features, end_points_t['sa1_inds'], masked_ind_list)
         end_points['sa1_inds'] = fps_inds
         end_points['sa1_xyz'] = xyz
         end_points['sa1_features'] = features
-
-        xyz, features, fps_inds = self.sa2(xyz, features) # this fps_inds is just 0,1,...,1023
+        if end_points_t==None:
+            xyz, features, fps_inds = self.sa2(xyz, features)
+        else:
+            xyz, features, fps_inds = self.sa2(xyz, features, end_points_t['sa2_inds'], masked_ind_list) # this fps_inds is just 0,1,...,1023
         end_points['sa2_inds'] = fps_inds
         end_points['sa2_xyz'] = xyz
         end_points['sa2_features'] = features
 
-        xyz, features, fps_inds = self.sa3(xyz, features) # this fps_inds is just 0,1,...,511
-        end_points['sa3_inds'] = fps_inds
+        if end_points_t==None:
+            xyz, features, fps_inds = self.sa3(xyz, features)
+        else:
+            xyz, features, fps_inds = self.sa3(xyz, features, end_points_t['sa3_inds'], masked_ind_list) # this fps_inds is just 0,1,...,511
         end_points['sa3_xyz'] = xyz
         end_points['sa3_features'] = features
 
-        xyz, features, fps_inds = self.sa4(xyz, features) # this fps_inds is just 0,1,...,255
-        end_points['sa4_inds'] = fps_inds
+        if end_points_t==None:
+            xyz, features, fps_inds = self.sa4(xyz, features)
+        else:
+            xyz, features, fps_inds = self.sa4(xyz, features, end_points_t['sa4_inds'], masked_ind_list) # this fps_inds is just 0,1,...,255
         end_points['sa4_xyz'] = xyz
         end_points['sa4_features'] = features
 

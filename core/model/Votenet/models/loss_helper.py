@@ -47,7 +47,7 @@ def compute_vote_loss(end_points, vote_xyz):
     # Load ground truth votes and assign them to seed points
     batch_size = end_points['seed_xyz'].shape[0]
     num_seed = end_points['seed_xyz'].shape[1] # B,num_seed,3
-    # vote_xyz = end_points['vote_xyz'] # B,num_seed*vote_factor,3
+    vote_xyz = end_points['vote_xyz'] # B,num_seed*vote_factor,3
     seed_inds = end_points['seed_inds'].long() # B,num_seed in [0,num_points-1]
 
     # Get groundtruth votes for the seed points
@@ -84,6 +84,7 @@ def compute_cascade_vote_loss(end_points):
     assert vote_stage <= 1
     vote_loss = torch.zeros(1).cuda()
     if vote_stage >= 1:  # just 1-stage loss
+        # vote_loss_stage_1没用
         end_points['vote_loss_stage_1'] = compute_vote_loss(end_points, end_points['vote_xyz_stage_1'])
         vote_loss += end_points['vote_loss_stage_1']
 

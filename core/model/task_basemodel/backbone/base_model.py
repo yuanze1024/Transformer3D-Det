@@ -52,14 +52,17 @@ class base_module(nn.Module):
     def _after_forward(self, input):
         return input
 
-    def forward(self, input):
+    def forward(self, input, output_t=None):
         input = self._before_forward(input)
         # _before_forward = getattr(self, '_before_forward')  # same
         # print('before_forward: done')
-        output = self._forward(input)
+        output = self._forward(input, output_t)
         input = self._after_forward(input)
         if self.mode == 'train':
-            return self.calculate_loss(input, output)
+            loss_dict = self.calculate_loss(input, output)
+            for key in loss_dict:
+                output[key] = loss_dict[key]
+            return output
         elif self.mode == 'val':
             return self.calculate_error(input, output)
         elif self.mode == 'test':

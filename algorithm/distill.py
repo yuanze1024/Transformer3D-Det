@@ -12,7 +12,7 @@ from core.other.lr_scheduler import get_lr_scheduler
 from core.other.logs import Loggers
 from core.utils.utils import load_state
 from core.runner import getrunner
-import ipdb
+# import ipdb
 import yaml
 from easydict import EasyDict
 import torch
@@ -20,7 +20,7 @@ import torch.utils.data as data
 # print(os.getcwd())
 
 parser = argparse.ArgumentParser(description='PyTorch training script')
-parser.add_argument('--config', default='config.yaml', type=str, help='config yaml path')
+parser.add_argument('--config', default='distill_cfg.yaml', type=str, help='config yaml path')
 parser.add_argument('--test', action='store_true', default=False, help='(option) use testset to test model')
 parser.add_argument('--save', action='store_true', default=False, help='(option) generate testset result')
 parser.add_argument('--recover', action='store_true', default=False, help='(option) change config and recover')
@@ -67,6 +67,8 @@ def main():
     test_datasets = get_dataset(config.test.dataset)
 
     model = model_entry(config.common.model)
+    model_t = model_entry(config.common.model_t)
+    # model_t.eval()
     # import ipdb; ipdb.set_trace()
     # TO CHANGE BASE_LR AND WEIGHT_DECAY (group parameters)
     base_lr = config.train.lr_scheduler.base_lr
@@ -82,6 +84,7 @@ def main():
     if torch.cuda.is_available:
         print('Using Cuda!')
         model = model.cuda()
+        model_t = model_t.cuda()
     if torch.cuda.device_count() > 1:
         sync_type = 2  # syncbn; using distributed
         if sync_type == 1:  # syncbn需要单独封装...
@@ -115,16 +118,16 @@ def main():
     lowest_err, last_iter = float('inf'), -1
     if config.common.load.load:  # load model
         load_path = config.common.load.path
-        print('load model from %s' % load_path)
+        print('load model_t from %s' % load_path)
         if not os.path.exists(load_path):
             raise AssertionError('load_path not exist')
         load_way = config.common.load.get('type', 'recover')
         if load_way == 'recover':
             print('Resume training from a previous checkpoint ...')
-            lowest_err, last_iter = load_state(load_path, model, optimizer=optimizer)
+            lowest_err, last_iter = load_state(load_path, model_t, optimizer=optimizer)
         elif load_way in ['finetune', 'test']:
             print('Finetuning from a previous model ...')
-            load_state(load_path, model)
+            load_state(load_path, model_t)
         else:
             raise NotImplementedError('load_way: %s' % load_way)
     else:
@@ -169,6 +172,7 @@ def main():
         'lowest_error': lowest_err,
         'loggers': loggers,
         'model': model,
+        'model_t': model_t,
         'last_iter': last_iter,
     }
     runner = getrunner(config.train.runner)

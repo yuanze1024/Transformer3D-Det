@@ -11,7 +11,6 @@ def model_entry(config):
         packagepath = 'core.model.' + dirname
         # print('try to load from ', dirname, packagepath)
         try:
-            # ipdb.set_trace()
             packagemodule = importlib.import_module(packagepath)
             func = packagemodule.model_entry
             model = func(config)

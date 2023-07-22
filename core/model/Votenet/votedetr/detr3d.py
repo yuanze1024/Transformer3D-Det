@@ -146,6 +146,7 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
             hs = value
         else:
             raise NotImplementedError(self.transformer_type)
+        # hc's shape is [4, 8, 256, 288], use the last one
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs)
         # outputs_coord = outputs_coord.sigmoid()
@@ -164,6 +165,7 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
                 assert len(value) == 2
         else:
             output = {'pred_logits': outputs_class, 'pred_boxes': outputs_coord}  # final
+        output['refined_vote_feature'] = hs[-1] # [8, 256, 288]
         return output
 
     # @torch.jit.unused

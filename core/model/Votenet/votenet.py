@@ -27,19 +27,19 @@ class votenet(base_module):
         else:
             raise NotImplementedError(config.task_type)
         if config.net_type == 'votenet':
-            from .models.votenet import VoteNet
+            from .models.votenet_s import VoteNet_S
             from ap_helper import APCalculator, parse_predictions, parse_groundtruths
             self.APCalculator = APCalculator
             self.parse_predictions = parse_predictions
             self.parse_groundtruths = parse_groundtruths
-            self.net = VoteNet(num_class=DATASET_CONFIG.num_class,
-                               num_heading_bin=DATASET_CONFIG.num_heading_bin,
-                               num_size_cluster=DATASET_CONFIG.num_size_cluster,
-                               mean_size_arr=DATASET_CONFIG.mean_size_arr,
-                               num_proposal=config.num_target,
-                               input_feature_dim=config.num_input_channel,
-                               vote_factor=config.vote_factor,
-                               sampling=config.cluster_sampling)
+            self.net = VoteNet_S(num_class=DATASET_CONFIG.num_class,
+                                 num_heading_bin=DATASET_CONFIG.num_heading_bin,
+                                 num_size_cluster=DATASET_CONFIG.num_size_cluster,
+                                 mean_size_arr=DATASET_CONFIG.mean_size_arr,
+                                 num_proposal=config.num_target,
+                                 input_feature_dim=config.num_input_channel,
+                                 vote_factor=config.vote_factor,
+                                 sampling=config.cluster_sampling)
             loss_type = config.get('loss_type', 'NMS')
             if loss_type == 'NMS':
                 from .models.votenet import get_loss
@@ -84,8 +84,8 @@ class votenet(base_module):
         # self.init_relu = 'relu'
         # self.init_params(nn.BatchNorm2d, init_type='kaiming_normal')
 
-    def _forward(self, input):
-        return self.net(input)
+    def _forward(self, input, output_t=None):
+        return self.net(input) if output_t is None else self.net(input, output_t)
 
     def calculate_loss(self, input, output, direct_return=False):
         for key in input:
