@@ -18,6 +18,8 @@ from easydict import EasyDict
 import torch
 import torch.utils.data as data
 # print(os.getcwd())
+from datetime import datetime
+TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S}".format(datetime.now())
 
 parser = argparse.ArgumentParser(description='PyTorch training script')
 parser.add_argument('--config', default='distill_cfg.yaml', type=str, help='config yaml path')
@@ -61,6 +63,10 @@ def main():
         config.common.logs.base_logger.path += '.save'
         config.train.runner.name = 'save'
 
+    for value in config.common.logs.values():
+        value['path'] = value['path'].format(TIMESTAMP)
+    config.train.runner.snapshot_save_path = config.train.runner.snapshot_save_path.format(TIMESTAMP)
+    import ipdb; ipdb.set_trace()
     loggers = Loggers(config.common.logs)
     loggers.update_loss({'args_out': args, 'config_out': config}, True)
     train_dataset = get_one_dataset(config.train.dataset)

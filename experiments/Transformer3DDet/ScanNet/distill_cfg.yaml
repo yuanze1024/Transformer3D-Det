@@ -51,11 +51,11 @@ common:
                 
     logs:
         base_logger:
-            path: log/log.txt
+            path: log/{}/log.txt
         tensorboard_logger:
-            path: log
+            path: log/{}
     snapshot:
-        save_path: snapshot
+        save_path: log/{}/snapshot
     load:
         load: True
         path: ./best_teacher.pth.tar
@@ -92,7 +92,7 @@ train:
         test_freq: 151
         save_freq: 27180
         log_freq: 10
-        snapshot_save_path: snapshot
+        snapshot_save_path: log/{}/snapshot
     params_weight_dict:
         bias:
             weight_decay: 0
