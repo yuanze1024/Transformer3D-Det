@@ -63,10 +63,10 @@ def main():
         config.common.logs.base_logger.path += '.save'
         config.train.runner.name = 'save'
 
+    # log文件夹名称添加时间戳
     for value in config.common.logs.values():
         value['path'] = value['path'].format(TIMESTAMP)
     config.train.runner.snapshot_save_path = config.train.runner.snapshot_save_path.format(TIMESTAMP)
-    import ipdb; ipdb.set_trace()
     loggers = Loggers(config.common.logs)
     loggers.update_loss({'args_out': args, 'config_out': config}, True)
     train_dataset = get_one_dataset(config.train.dataset)
@@ -133,7 +133,12 @@ def main():
             lowest_err, last_iter = load_state(load_path, model_t, optimizer=optimizer)
         elif load_way in ['finetune', 'test']:
             print('Finetuning from a previous model ...')
-            load_state(load_path, model_t)
+            # load_state(load_path, model_t)
+            checkpoint = torch.load(load_path)
+            for key in list(checkpoint['model_state_dict']):
+                if key.startswith('vgen.'):
+                    checkpoint['model_state_dict']['vgen1.' + key[5:]] = checkpoint['model_state_dict'].pop(key)
+            model_t.net.load_state_dict(checkpoint['model_state_dict'], strict=False)
         else:
             raise NotImplementedError('load_way: %s' % load_way)
     else:
@@ -180,6 +185,7 @@ def main():
         'model': model,
         'model_t': model_t,
         'last_iter': last_iter,
+        'teacher_optimizer_config': config.train.optimizer
     }
     runner = getrunner(config.train.runner)
     runner(info)

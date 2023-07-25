@@ -3,7 +3,8 @@ import torch.optim as optim
 
 def get_optimizer(config, parameters):
     name = config.name
-    del config['name']
+    if config.__contains__('name'):
+        del config['name'] 
     print('using optimizer %s' % name)
     print(config)
     if name == "Adam":

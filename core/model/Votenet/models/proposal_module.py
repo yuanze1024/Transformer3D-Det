@@ -108,6 +108,7 @@ class ProposalModule(nn.Module):
         # --------- PROPOSAL GENERATION ---------
         net = F.relu(self.bn1(self.conv1(features))) 
         net = F.relu(self.bn2(self.conv2(net))) 
+        end_points['penultimate_features'] = net.permute(0, 2, 1)
         # print(features.mean(), features.std(), '<< features std and mean, validation', flush=True)
         net = self.conv3(net) # (batch_size, 2+3+num_heading_bin*2+num_size_cluster*4, num_proposal)
 

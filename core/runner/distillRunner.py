@@ -4,6 +4,7 @@ from .runner_utils.testRunnerUtils import testmodel
 import torch
 import time
 import traceback
+from core.other.optimizer import get_optimizer
 from torch.nn.functional import huber_loss
 
 def print_grad(model, keyword=None):
@@ -49,12 +50,15 @@ def distillRunner(info):
     loggers = info['loggers']
     lowest_error = info['lowest_error']
     last_iter = info['last_iter']
+    teacher_optimizer_config = info['teacher_optimizer_config']
     clip_grad_norm = config.get('clip_grad_norm', None)
     if clip_grad_norm is not None:
         print('CLIP GRAD NORM! MAX =', clip_grad_norm)
     t_start = time.time()
     T_START = time.time()
     model_t.test_mode()
+    model_t.net.refine_module.train()
+    optimizer_t = get_optimizer(teacher_optimizer_config, model_t.net.refine_module.parameters())
     if isinstance(model, torch.nn.DataParallel):
         model.module.train_mode()
     elif isinstance(model, torch.nn.Module):
@@ -79,6 +83,7 @@ def distillRunner(info):
                 train_loader_iter = iter(info['traindataloader'])
         input = transform_input(input)
         optimizer.zero_grad()
+        optimizer_t.zero_grad()
         t_loader = time.time()
         output_t = model_t(input)
         # 'aggregated_vote_xyz', 'aggregated_vote_features', 'aggregated_vote_inds'
@@ -108,6 +113,7 @@ def distillRunner(info):
         # if True:# and False:  # just print
         #     print_grad(model, '.0.weight')  # conv_first
         optimizer.step()
+        optimizer_t.step()
         # print('backward okay') # for test
         output['iteration'] = [iter_id, config.max_iter, (iter_id + 1) / len(info['traindataloader'])]
         output['loader_time'] = t_loader - t_start
@@ -118,47 +124,48 @@ def distillRunner(info):
         output['mean_time_iter'] = (t_tmp - T_START) / (iter_id - last_iter)
         t_start = t_tmp
         output['lr'] = lr_scheduler.get_lr()[0]
-        if iter_id != -1 and (iter_id % config.test_freq == 0 or iter_id % config.save_freq == 0):
-            if isinstance(model, torch.nn.DataParallel):
-                model.module.val_mode()
-            elif isinstance(model, torch.nn.Module):
-                model.val_mode()  # change mode
-            else:
-                raise NotImplementedError(type(model))
-            output_error = {}
-            error, weight, test_time = [], [], 0.
-            for testset_name, loader in info['testdataloaders'].items():
-                _error, _weight = testmodel(model, loader, loggers, config.log_freq, testset_name, iter_id)
-                error.append(_error)
-                weight.append(_weight)
-                test_time += time.time() - t_start
-                t_start = time.time()
-                output_error[testset_name + '_error'] = _error
-            error_final = sum(error) / sum(weight)  # calculate mean
-            # for logger
-            output_error['time'] = test_time
-            output_error['test_time'] = test_time
-            output_error['error'] = error_final
-            output_error['prev_lowest_error'] = lowest_error
-            output_error['flush'] = True
-            output_error['n_count'] = 1
-            loggers.update_error(output_error, True)  # similiar as model.val
-            is_best = error_final < lowest_error
-            if is_best or iter_id % config.save_freq == 0:
-                if is_best:
-                    lowest_error = error_final
-                save_checkpoint({
-                    'step': iter_id,
-                    'state_dict': model.state_dict(),
-                    'lowest_error': lowest_error,
-                    'optimizer': optimizer.state_dict(),
-                }, is_best, config.snapshot_save_path + '/ckpt' + '_' + str(iter_id))
-            if isinstance(model, torch.nn.DataParallel):
-                model.module.train_mode()
-            elif isinstance(model, torch.nn.Module):
-                model.train_mode()  # change mode
-            else:
-                raise NotImplementedError(type(model))
+        with torch.no_grad(): # 省着切换train和val模式了
+            if iter_id != -1 and (iter_id % config.test_freq == 0 or iter_id % config.save_freq == 0):
+                if isinstance(model, torch.nn.DataParallel):
+                    model.module.val_mode()
+                elif isinstance(model, torch.nn.Module):
+                    model.val_mode()  # change mode
+                else:
+                    raise NotImplementedError(type(model))
+                output_error = {}
+                error, weight, test_time = [], [], 0.
+                for testset_name, loader in info['testdataloaders'].items():
+                    _error, _weight = testmodel(model, loader, loggers, config.log_freq, testset_name, iter_id)
+                    error.append(_error)
+                    weight.append(_weight)
+                    test_time += time.time() - t_start
+                    t_start = time.time()
+                    output_error[testset_name + '_error'] = _error
+                error_final = sum(error) / sum(weight)  # calculate mean
+                # for logger
+                output_error['time'] = test_time
+                output_error['test_time'] = test_time
+                output_error['error'] = error_final
+                output_error['prev_lowest_error'] = lowest_error
+                output_error['flush'] = True
+                output_error['n_count'] = 1
+                loggers.update_error(output_error, True)  # similiar as model.val
+                is_best = error_final < lowest_error
+                if is_best or iter_id % config.save_freq == 0:
+                    if is_best:
+                        lowest_error = error_final
+                    save_checkpoint({
+                        'step': iter_id,
+                        'state_dict': model.state_dict(),
+                        'lowest_error': lowest_error,
+                        'optimizer': optimizer.state_dict(),
+                    }, is_best, config.snapshot_save_path + '/ckpt' + '_' + str(iter_id))
+                if isinstance(model, torch.nn.DataParallel):
+                    model.module.train_mode()
+                elif isinstance(model, torch.nn.Module):
+                    model.train_mode()  # change mode
+                else:
+                    raise NotImplementedError(type(model))
         lr_scheduler.step()
         loggers.update_loss(output, iter_id % config.log_freq == 0)  # TODO
     print('training: done')

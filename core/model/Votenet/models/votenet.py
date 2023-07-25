@@ -20,6 +20,8 @@ from voting_module import VotingModule
 from proposal_module import ProposalModule
 from dump_helper import dump_results
 from loss_helper import get_loss
+from ..votedetr.detr3d import DETR3D
+from ..votedetr.proposal_votenet import decode_scores
 
 
 class VoteNet(nn.Module):
@@ -42,7 +44,7 @@ class VoteNet(nn.Module):
     """
 
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
-                 input_feature_dim=0, num_proposal=128, vote_factor=1, sampling='vote_fps', vote_stage=1):
+                 input_feature_dim=0, num_proposal=128, vote_factor=1, sampling='vote_fps', vote_stage=1, config_transformer=None, quality_channel=False):
         super().__init__()
 
         self.num_class = num_class
@@ -55,6 +57,8 @@ class VoteNet(nn.Module):
         self.vote_factor = vote_factor
         self.sampling = sampling
         self.vote_stage = vote_stage
+        self.quality_channel = quality_channel
+        self.center_with_bias = 'dec' not in config_transformer.get('transformer_type', 'enc_dec')
         assert vote_stage in [1, 2, 3]
 
         # Backbone point feature learning
@@ -62,12 +66,14 @@ class VoteNet(nn.Module):
 
         # Hough voting
         self.vgen1 = VotingModule(self.vote_factor, 256)
-        self.vgen2 = VotingModule(self.vote_factor, 256)
-        self.vgen3 = VotingModule(self.vote_factor, 256)
-
+        if self.vote_stage > 1:
+            self.vgen2 = VotingModule(self.vote_factor, 256)
+            self.vgen3 = VotingModule(self.vote_factor, 256)
         # Vote aggregation and detection
         self.pnet = ProposalModule(num_class, num_heading_bin, num_size_cluster,
                                    mean_size_arr, num_proposal, sampling)
+
+        self.refine_module = DETR3D(config_transformer, input_channels=128, class_output_shape=2+num_class, bbox_output_shape=3+num_heading_bin*2+num_size_cluster*4+int(quality_channel))
 
     def forward(self, inputs):
         """ Forward pass of the network
@@ -111,6 +117,9 @@ class VoteNet(nn.Module):
         end_points['vote_features'] = features
 
         end_points = self.pnet(xyz, features, end_points)
+
+        output_dict = self.refine_module(end_points['aggregated_vote_xyz'], end_points['penultimate_features'], end_points)
+        end_points = decode_scores(output_dict, end_points, self.num_class, self.num_heading_bin, self.num_size_cluster, self.mean_size_arr, self.center_with_bias, quality_channel=self.quality_channel)
 
         return end_points
 

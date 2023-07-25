@@ -2,10 +2,10 @@ common:
     model_t:
         name: votenet
         task_type: Scannetv2
-        net_type: detr
+        net_type: votenet
         # net_type: votenet
         loss_type: NMS
-        num_input_channel: 0
+        num_input_channel: 1
         num_target: 256
         vote_factor: 1
         cluster_sampling: vote_fps
@@ -24,12 +24,27 @@ common:
             dropout: 0.1
             nheads: 8
             pre_norm: False
+            loss_weight:
+                loss_weight:
+                    center_loss: 1
+                    heading_class_loss: 0.1
+                    heading_residual_loss: 1
+                    size_class_loss: 0.1
+                    size_residual_loss: 1
+                    # no_vote_loss: 0
+
+                    vote_loss: 1
+                    objectness_loss: 0.5
+                    box_loss: 1
+                    sem_cls_loss: 0.1
+
+                    all_weight: 10
     model:
         name: votenet
         task_type: Scannetv2
-        net_type: votenet
+        net_type: votenet_s
         loss_type: NMS
-        num_input_channel: 0
+        num_input_channel: 1
         num_target: 256
         vote_factor: 1
         cluster_sampling: vote_fps
@@ -58,7 +73,7 @@ common:
         save_path: log/{}/snapshot
     load:
         load: True
-        path: ./best_teacher.pth.tar
+        path: ./ckpt_best_votenet_model.pth.tar
         type: test
 train:
     batch_size: 8
@@ -66,12 +81,12 @@ train:
     dataset:
         name: Scannetv2
         split_set: train
-        data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
-        # data_path: /home/yuanze/data/scannet_train_detection_data
+        # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+        data_path: /home/yuanze/data/scannet_train_detection_data
         num_points: 40000
         augment: True
         # use_color: True
-        # use_height: True  # use it as feature
+        use_height: True  # 还是需要height，只为与votenet蒸馏保持一致
         augment_more: True
     optimizer:
         name: AdamW
@@ -105,7 +120,8 @@ test:
         valset:
             name: Scannetv2
             split_set: val
-            data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+            data_path: /home/yuanze/data/scannet_train_detection_data
+            # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
             num_points: 40000
             # use_color: True
-            # use_height: True  # use it as feature
+            use_height: True  # use it as feature

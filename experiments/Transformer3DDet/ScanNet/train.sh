@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J vote_refine
+#SBATCH -J yuanze_refine
 #SBATCH -p gpu-quota
 #SBATCH --gres=gpu:1
 #SBATCH -o plain.out

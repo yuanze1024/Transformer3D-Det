@@ -25,7 +25,7 @@ def save_checkpoint(state, is_best, filename):
     ensure_sub_dir(filename)
     torch.save(state, filename + '.pth.tar')
     if is_best:
-        shutil.copyfile(filename + '.pth.tar', 'ckpt_best_model.pth.tar')
+        shutil.copyfile(filename + '.pth.tar', 'ckpt_best_student_model.pth.tar')
 
 
 def load_state(path, model, map_location='cpu', optimizer=None):  # directly to gpu

@@ -26,7 +26,7 @@ class votenet(base_module):
             self.DATASET_CONFIG = DATASET_CONFIG
         else:
             raise NotImplementedError(config.task_type)
-        if config.net_type == 'votenet':
+        if config.net_type == 'votenet_s':
             from .models.votenet_s import VoteNet_S
             from ap_helper import APCalculator, parse_predictions, parse_groundtruths
             self.APCalculator = APCalculator
@@ -40,6 +40,33 @@ class votenet(base_module):
                                  input_feature_dim=config.num_input_channel,
                                  vote_factor=config.vote_factor,
                                  sampling=config.cluster_sampling)
+            loss_type = config.get('loss_type', 'NMS')
+            if loss_type == 'NMS':
+                import os
+                import sys
+                sys.path.append(os.path.split(os.path.realpath(__file__))[0] + '/votedetr')
+                from .models.votenet import get_loss
+            elif loss_type == 'matching_giou':
+                from .votedetr.votedetr import VoteDetr
+                from .votedetr.detr_matching_loss_giou_helper import get_loss
+            else:
+                raise NotImplementedError(config.loss_type)
+            self.criterion = get_loss
+        elif config.net_type == 'votenet':
+            from .models.votenet import VoteNet
+            from ap_helper import APCalculator, parse_predictions, parse_groundtruths
+            self.APCalculator = APCalculator
+            self.parse_predictions = parse_predictions
+            self.parse_groundtruths = parse_groundtruths
+            self.net = VoteNet(num_class=DATASET_CONFIG.num_class,
+                                 num_heading_bin=DATASET_CONFIG.num_heading_bin,
+                                 num_size_cluster=DATASET_CONFIG.num_size_cluster,
+                                 mean_size_arr=DATASET_CONFIG.mean_size_arr,
+                                 num_proposal=config.num_target,
+                                 input_feature_dim=config.num_input_channel,
+                                 vote_factor=config.vote_factor,
+                                 sampling=config.cluster_sampling,
+                                 config_transformer=config.transformer,)
             loss_type = config.get('loss_type', 'NMS')
             if loss_type == 'NMS':
                 from .models.votenet import get_loss
