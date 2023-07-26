@@ -1,4 +1,14 @@
+#!/bin/bash
+
+#SBATCH -J yuanze_refine_sunrgbd
+#SBATCH -p gpu-quota
+#SBATCH --gres=gpu:1
+#SBATCH -o default_setting.out
+#SBATCH -e default_setting.err
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=4
+
+source activate pt112
+
 mkdir -p log
-PYTHONPATH=$PYTHONPATH:../../../../ GLOG_vmodule=MemcachedClient=-1 \
-srun --mpi=pmi2 -p $1 -n1 --gres=gpu:1 --ntasks-per-node=1 --cpus-per-task=5 \
-python -u -m algorithm.main --config config.yaml  2>&1|tee log/train_log.txt
+python ../../../algorithm/distill.py

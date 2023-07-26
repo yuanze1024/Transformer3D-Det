@@ -1,7 +1,7 @@
 common:
     model_t:
         name: votenet
-        task_type: Scannetv2
+        task_type: Sunrgbd
         net_type: votenet
         # net_type: votenet
         loss_type: NMS
@@ -41,7 +41,7 @@ common:
                     all_weight: 10
     model:
         name: votenet
-        task_type: Scannetv2
+        task_type: Sunrgbd
         net_type: votenet_s
         loss_type: NMS
         num_input_channel: 1
@@ -55,7 +55,7 @@ common:
                 heading_residual_loss: 1
                 size_class_loss: 0.1
                 size_residual_loss: 1
-                # no_vote_loss: 1
+                # no_vote_loss: 0
 
                 vote_loss: 1
                 objectness_loss: 0.5
@@ -73,21 +73,30 @@ common:
         save_path: log/{}/snapshot
     load:
         load: True
-        path: ./ckpt_best_votenet_model.pth.tar
+        path: ./ckpt_best_sunrgbd_votenet_model.pth.tar
         type: test
 train:
     batch_size: 8
     workers: 4
     dataset:
-        name: Scannetv2
+        name: Sunrgbd
         split_set: train
-        data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
-        # data_path: /home/yuanze/data/scannet_train_detection_data
-        num_points: 40000
+        data_path: /gs/home/yuanze1025/ProjectSpace/votenet
+        # data_path: /home/yuanze/ProjectZone/votenet
         augment: True
         # use_color: True
         use_height: True  # 还是需要height，只为与votenet蒸馏保持一致
-        augment_more: True
+        use_v1: True
+    # optimizer:
+    #     name: AdamW
+    #     betas: [0.9, 0.999]
+    #     eps: 0.00000001
+    #     weight_decay: 0.0001
+    # lr_scheduler:
+    #     type: cosine
+    #     T_max: 118980
+    #     base_lr: 0.001
+    #     eta_min: 0.0001
     optimizer:
         name: AdamW
         betas: [0.9, 0.999]
@@ -95,17 +104,17 @@ train:
         weight_decay: 0.000001
     lr_scheduler:
         type: cosine
-        T_max: 27180
+        T_max: 118980
         base_lr: 0.005
         eta_min: 0.00001
     transform: None # TODO
     runner:
         name: distill
-        max_iter: 27180 # 180 * 1201 / 8
+        max_iter: 118980 # 180 * [5285 / 8]向上取整
         # test and save
         # test_freq: 1600
-        test_freq: 151
-        save_freq: 27180
+        test_freq: 2644 # 661 * 4, 4 epoch test一次，否则太慢了
+        save_freq: 118980
         log_freq: 10
         snapshot_save_path: log/{}/snapshot
     params_weight_dict:
@@ -118,10 +127,10 @@ test:
     workers: 4
     dataset:
         valset:
-            name: Scannetv2
+            name: Sunrgbd
             split_set: val
-            # data_path: /home/yuanze/data/scannet_train_detection_data
-            data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
-            num_points: 40000
+            # data_path: /home/yuanze/ProjectZone/votenet
+            data_path: /gs/home/yuanze1025/ProjectSpace/votenet
             # use_color: True
             use_height: True  # use it as feature
+            use_v1: True
