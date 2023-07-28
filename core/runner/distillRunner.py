@@ -18,7 +18,56 @@ def print_grad(model, keyword=None):
         print('std: grad[%.5f] value[%.5f]' %(float(param.grad.detach().std().cpu()), float(param.data.detach().std().cpu())), 'shape', param.shape, flush=True)
         # print('real value', param.grad.cpu()[:3, :], param.data.cpu()[:3, :], flush=True)
 
-def compute_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature):
+# def get_seed_foreground_mask(seed_inds, vote_label_mask) -> torch.Tensor:
+#     """ 
+#     返回前景的mask。
+#     return:
+#     mask: (batch_size, n_point)
+#     """
+#     # index 需要是 int64类型，but why?
+#     seed_inds = seed_inds.long()
+#     foreground_mask = torch.gather(vote_label_mask, 1, seed_inds).float()
+#     zero_tensor = (foreground_mask == 0)
+#     num_bg = torch.sum(zero_tensor, axis=1)
+#     for i_batch in range(zero_tensor.shape[0]):
+#         if num_bg[i_batch] != 0:
+#             # 令背景的权重为每个batch中背景点个数的倒数
+#             foreground_mask[i_batch][foreground_mask[i_batch] == 0] = 1. / num_bg[i_batch]
+#     return foreground_mask
+
+SEED_DISTILL_WEIGHT = 1.
+VOTE_DISTILL_WEIGHT = 1.
+
+# def compute_seed_distill_loss(pred_s, pred_t, foreground_mask=1.):
+#     # pred_s, pred_t (B, C, npoint)
+#     global SEED_DISTILL_WEIGHT
+#     batch_size, _, num_tokens = pred_s.shape
+
+#     mse_loss = torch.sum(((pred_s-pred_t)*foreground_mask)**2)
+#     if type(foreground_mask) == float:
+#         mse_loss /= (batch_size * num_tokens)
+#     else:
+#         mse_loss /= (torch.sum(foreground_mask) + 1e-7)
+#     return mse_loss*SEED_DISTILL_WEIGHT
+
+def get_valid_vote_mask(vote_xyz, gt_box_center, gt_box_size):
+    """
+    vote_xyz: [B, N, 3]
+    gt_box_center: [B, O, 3]
+    gt_box_size: [B, O, 3]
+
+    return: [B, N]
+    """
+    _, N, _ = vote_xyz.shape
+    _, O, _ = gt_box_center.shape
+    vote_xyz = vote_xyz.unsqueeze(2).repeat(1, 1, O, 1)  # [B, N, O, 3]
+    gt_box_center = gt_box_center.unsqueeze(1).repeat(1, N, 1, 1)  # [B, N, O, 3]
+    mask = torch.abs(vote_xyz - gt_box_center) < gt_box_size.unsqueeze(1).repeat(1, N, 1, 1) / 2  # [B, N, O, 3]
+    mask = torch.all(mask, dim=-1)  # [B, N, O]
+    mask = torch.any(mask, dim=-1)  # [B, N]
+    return mask
+
+def compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature, vote_mask):
     """
     refined_vote_xyz: [B, N, 3]
     refined_vote_features: [B, N, 288]
@@ -28,6 +77,14 @@ def compute_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, alig
     regard the refined_vote_xyz as the ground truth, find the nearest refined_vote for each vote_xyz,
     and calculate the mse loss between the aligned_vote_feature and corresponding refined_vote_features
     """
+    # TODO: 如果是object之外的点，就直接去掉，不进行指导
+    global VOTE_DISTILL_WEIGHT
+    import ipdb; ipdb.set_trace()
+    # 得到每个batch中第一个为1的vote_mask的index
+    vote_mask_index = torch.argmax(vote_mask.half(), dim=1)  # [B]
+    vote_mask = vote_mask.unsqueeze(-1).repeat(1, 1, 3)
+    refined_vote_xyz = torch.where(vote_mask, refined_vote_xyz, refined_vote_xyz[:, vote_mask_index, :])
+    refined_vote_features = torch.where(vote_mask, refined_vote_features, refined_vote_features[:, vote_mask_index, :])
     B, N, _ = refined_vote_xyz.shape
     _, M, _ = vote_xyz.shape
     dist = torch.sum((refined_vote_xyz.view(B, N, 1, 3) - vote_xyz.view(B, 1, M, 3)) ** 2, dim=-1)  # [B, N, M]
@@ -38,7 +95,7 @@ def compute_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, alig
     aligned_vote_feature = aligned_vote_feature.div(torch.norm(aligned_vote_feature, dim=-1, keepdim=True, p=2))
     refined_vote_features = torch.gather(refined_vote_features, dim=1, index=min_dist_ind)  # [B, M, 288]
     distill_loss = huber_loss(refined_vote_features, aligned_vote_feature) / B
-    return distill_loss
+    return distill_loss*VOTE_DISTILL_WEIGHT
 
 def distillRunner(info):
     config = info['config']
@@ -81,6 +138,7 @@ def distillRunner(info):
                     print('dataloader exception', str(e))
                     print(traceback.format_exc())
                 train_loader_iter = iter(info['traindataloader'])
+        # point_object_mask = input['vote_label_mask']
         input = transform_input(input)
         optimizer.zero_grad()
         optimizer_t.zero_grad()
@@ -100,7 +158,9 @@ def distillRunner(info):
                     output[key] = torch.mean(value, dim=0)
         assert 'loss' in output.keys(), 'Key "loss" should in output.keys'
         loss = output['loss']
-        loss += compute_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature)
+        # foreground_mask = get_seed_foreground_mask(output['seed_inds'], point_object_mask)
+        vote_mask = get_valid_vote_mask(refined_vote_xyz, input['center_label'], input['box_size'])
+        loss += compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature, vote_mask)
         # print(loss)
         loss.backward()
         if clip_grad_norm is not None:
