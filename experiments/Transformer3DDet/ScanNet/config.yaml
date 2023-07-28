@@ -59,8 +59,9 @@ train:
         # data_path: C:\Users\ZLC\Desktop\pycodes\data\scannet_train_detection_data
         # data_path: /data1/zhaolichen/data/scannet_train_detection_data
         # data_path: /home/yuanze/data/scannet_train_detection_data
-        data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+        # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
         # data_path: /mnt/lustre/liujie4/big/scannet_train_detection_data
+        data_path: /root/autodl-tmp/Data/scannet_train_detection_data
         num_points: 40000
         augment: True
         # use_color: True
@@ -101,7 +102,8 @@ test:
             # data_path: C:\Users\ZLC\Desktop\pycodes\data\scannet_train_detection_data
             # data_path: /data1/zhaolichen/data/scannet_train_detection_data
             # data_path: /mnt/lustre/liujie4/big/scannet_train_detection_data
-            data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+            # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+            data_path: /root/autodl-tmp/Data/scannet_train_detection_data
             # data_path: /home/yuanze/data/scannet_train_detection_data
             num_points: 40000
             # use_color: True

@@ -60,11 +60,13 @@ class VoteNet_S(nn.Module):
         # Backbone point feature learning
         self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim, scale_factor=scale_factor)
 
+        # Seed
+        self.seed_align = nn.Conv1d(256//scale_factor, 256, 1)
+
         # Hough voting
         self.vgen = VotingModule(self.vote_factor, 256//scale_factor)
 
         self.align = nn.Conv1d(256//scale_factor, 288, 1)
-
         # Vote aggregation and detection
         self.pnet = ProposalModule(num_class, num_heading_bin, num_size_cluster,
             mean_size_arr, num_proposal, sampling, scale_factor=scale_factor)
@@ -96,7 +98,7 @@ class VoteNet_S(nn.Module):
         end_points['seed_inds'] = end_points['fp2_inds']
         end_points['seed_xyz'] = xyz
         end_points['seed_features'] = features
-
+        end_points['aligned_seed_features'] = self.seed_align(features)
         xyz, features = self.vgen(xyz, features)
         features_norm = torch.norm(features, p=2, dim=1)
         features = features.div(features_norm.unsqueeze(1))

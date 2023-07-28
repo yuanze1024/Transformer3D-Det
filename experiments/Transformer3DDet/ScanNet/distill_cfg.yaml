@@ -81,7 +81,8 @@ train:
     dataset:
         name: Scannetv2
         split_set: train
-        data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+        # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+        data_path: /root/autodl-tmp/Data/scannet_train_detection_data
         # data_path: /home/yuanze/data/scannet_train_detection_data
         num_points: 40000
         augment: True
@@ -121,7 +122,8 @@ test:
             name: Scannetv2
             split_set: val
             # data_path: /home/yuanze/data/scannet_train_detection_data
-            data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+            # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+            data_path: /root/autodl-tmp/Data/scannet_train_detection_data
             num_points: 40000
             # use_color: True
             use_height: True  # use it as feature
