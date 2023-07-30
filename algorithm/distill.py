@@ -174,6 +174,12 @@ def main():
                 if torch.is_tensor(v):
                     state[k] = v.cuda()
 
+    model_t.test_mode()
+    model_t.net.refine_module.train()
+    weight_dict = config.train.get('params_weight_dict_t', None)
+    parameters = model_t.set_params(base_lr, weight_decay, weight_type, weight_dict)
+    optimizer_t = get_optimizer(config.train.optimizer, parameters)
+
     info = {
         'config': config.train.runner,
         'traindataloader': traindataloader,
@@ -185,7 +191,7 @@ def main():
         'model': model,
         'model_t': model_t,
         'last_iter': last_iter,
-        'teacher_optimizer_config': config.train.optimizer
+        'teacher_optimizer': optimizer_t
     }
     runner = getrunner(config.train.runner)
     runner(info)

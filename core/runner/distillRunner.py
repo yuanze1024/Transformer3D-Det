@@ -110,15 +110,12 @@ def distillRunner(info):
     loggers = info['loggers']
     lowest_error = info['lowest_error']
     last_iter = info['last_iter']
-    teacher_optimizer_config = info['teacher_optimizer_config']
+    optimizer_t = info['teacher_optimizer']
     clip_grad_norm = config.get('clip_grad_norm', None)
     if clip_grad_norm is not None:
         print('CLIP GRAD NORM! MAX =', clip_grad_norm)
     t_start = time.time()
     T_START = time.time()
-    model_t.test_mode()
-    model_t.net.refine_module.train()
-    optimizer_t = get_optimizer(teacher_optimizer_config, model_t.net.refine_module.parameters())
     if isinstance(model, torch.nn.DataParallel):
         model.module.train_mode()
     elif isinstance(model, torch.nn.Module):

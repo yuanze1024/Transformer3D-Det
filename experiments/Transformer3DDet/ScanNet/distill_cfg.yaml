@@ -81,8 +81,8 @@ train:
     dataset:
         name: Scannetv2
         split_set: train
-        data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
-        # data_path: /home/yuanze/data/scannet_train_detection_data
+        # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+        data_path: /home/yuanze/data/scannet_train_detection_data
         num_points: 40000
         augment: True
         # use_color: True
@@ -111,7 +111,12 @@ train:
     params_weight_dict:
         bias:
             weight_decay: 0
-        detr:  # other: default
+        refine_module:  # other: default
+            lr: 0.0001
+    params_weight_dict_t:
+        bias:
+            weight_decay: 0
+        refine_module:  # other: default
             lr: 0.0001
 test:
     batch_size: 8
@@ -120,8 +125,8 @@ test:
         valset:
             name: Scannetv2
             split_set: val
-            # data_path: /home/yuanze/data/scannet_train_detection_data
-            data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
+            data_path: /home/yuanze/data/scannet_train_detection_data
+            # data_path: /gs/home/yuanze1025/ProjectSpace/votenet/scannet/scannet_train_detection_data
             num_points: 40000
             # use_color: True
             use_height: True  # use it as feature
