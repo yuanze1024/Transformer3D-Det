@@ -39,7 +39,9 @@ class votenet(base_module):
                                  num_proposal=config.num_target,
                                  input_feature_dim=config.num_input_channel,
                                  vote_factor=config.vote_factor,
-                                 sampling=config.cluster_sampling)
+                                 sampling=config.cluster_sampling,
+                                 scale_factor=config.scale_factor,
+                                 )
             loss_type = config.get('loss_type', 'NMS')
             if loss_type == 'NMS':
                 import os

@@ -48,6 +48,7 @@ common:
         num_target: 256
         vote_factor: 1
         cluster_sampling: vote_fps
+        scale_factor: 4 # student模型的通道放缩倍数
         loss_weight:
             loss_weight:
                 center_loss: 1
@@ -97,7 +98,7 @@ train:
     lr_scheduler:
         type: cosine
         T_max: 27180
-        base_lr: 0.005
+        base_lr: 0.01
         eta_min: 0.00001
     transform: None # TODO
     runner:
@@ -112,7 +113,12 @@ train:
     params_weight_dict:
         bias:
             weight_decay: 0
-        detr:  # other: default
+        refine_module:  # other: default
+            lr: 0.0001
+    params_weight_dict_t:
+        bias:
+            weight_decay: 0
+        refine_module:  # other: default
             lr: 0.0001
 test:
     batch_size: 8
