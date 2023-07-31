@@ -48,7 +48,7 @@ common:
         num_target: 256
         vote_factor: 1
         cluster_sampling: vote_fps
-        scale_factor: 4 # student模型的通道放缩倍数
+        scale_factor: 2 # student模型的通道放缩倍数
         loss_weight:
             loss_weight:
                 center_loss: 1

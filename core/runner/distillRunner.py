@@ -101,7 +101,7 @@ def compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz,
     refined_vote_features = torch.where(vote_feature_mask, refined_vote_features, valid_features)
     B, N, _ = refined_vote_xyz.shape
     _, M, _ = vote_xyz.shape
-    dist = torch.sum((refined_vote_xyz.view(B, N, 1, 3) - vote_xyz.view(B, 1, M, 3)) ** 2, dim=-1)  # [B, N, M]
+    dist = torch.sum(torch.abs(refined_vote_xyz.view(B, N, 1, 3) - vote_xyz.view(B, 1, M, 3)), dim=-1)  # [B, N, M]
     _, min_dist_ind = torch.min(dist, dim=1)  # [B, M]
     min_dist_ind = min_dist_ind.unsqueeze(-1).repeat(1, 1, 288)  # [B, M, 288]
     # standardize the refined_vote_features and aligned_vote_feature in the feature dimension
@@ -169,7 +169,8 @@ def distillRunner(info):
         assert 'loss' in output.keys(), 'Key "loss" should in output.keys'
         loss = output['loss']
         # foreground_mask = get_seed_foreground_mask(output['seed_inds'], point_object_mask)
-        vote_mask, x = get_valid_vote_mask(refined_vote_xyz, input['center_label'], input['box_size'])
+        vote_mask, percent = get_valid_vote_mask(refined_vote_xyz, input['center_label'], input['box_size'])
+        output['percent_not_loss'] = percent
         output['vote_distill_loss'] = compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature, vote_mask)
         loss += output['vote_distill_loss']
         # print(loss)
@@ -199,8 +200,10 @@ def distillRunner(info):
             if iter_id != -1 and (iter_id % config.test_freq == 0 or iter_id % config.save_freq == 0):
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.val_mode()
+                    model_t.module.val_mode()
                 elif isinstance(model, torch.nn.Module):
                     model.val_mode()  # change mode
+                    model_t.val_mode()
                 else:
                     raise NotImplementedError(type(model))
                 output_error = {}
@@ -233,8 +236,10 @@ def distillRunner(info):
                     }, is_best, config.snapshot_save_path + '/ckpt' + '_' + str(iter_id))
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.train_mode()
+                    model_t.module.train_mode()
                 elif isinstance(model, torch.nn.Module):
                     model.train_mode()  # change mode
+                    model_t.train_mode()
                 else:
                     raise NotImplementedError(type(model))
         lr_scheduler.step()
