@@ -177,6 +177,9 @@ def main():
     model_t.test_mode()
     model_t.net.refine_module.train()
     weight_dict = config.train.get('params_weight_dict_t', None)
+    for name, param in model_t.named_parameters():
+        if "refine_module" not in name:
+            param.requires_grad = False
     parameters = model_t.set_params(base_lr, weight_decay, weight_type, weight_dict)
     optimizer_t = get_optimizer(config.train.optimizer, parameters)
 
