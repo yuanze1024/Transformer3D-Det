@@ -4,7 +4,6 @@ from .runner_utils.testRunnerUtils import testmodel
 import torch
 import time
 import traceback
-from core.other.optimizer import get_optimizer
 from torch.nn.functional import huber_loss
 
 def print_grad(model, keyword=None):
@@ -189,10 +188,10 @@ def distillRunner(info):
             if iter_id != -1 and (iter_id % config.test_freq == 0 or iter_id % config.save_freq == 0):
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.val_mode()
-                    model_t.module.val_mode()
+                    model_t.module.net.refine_module.eval()
                 elif isinstance(model, torch.nn.Module):
                     model.val_mode()  # change mode
-                    model_t.val_mode()
+                    model_t.net.refine_module.eval()
                 else:
                     raise NotImplementedError(type(model))
                 output_error = {}
@@ -225,10 +224,10 @@ def distillRunner(info):
                     }, is_best, config.snapshot_save_path + '/ckpt' + '_' + str(iter_id))
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.train_mode()
-                    model_t.module.train_mode()
+                    model_t.module.net.refine_module.train()
                 elif isinstance(model, torch.nn.Module):
                     model.train_mode()  # change mode
-                    model_t.train_mode()
+                    model_t.net.refine_module.train()
                 else:
                     raise NotImplementedError(type(model))
         lr_scheduler.step()
