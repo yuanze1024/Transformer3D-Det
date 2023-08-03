@@ -104,8 +104,8 @@ class VoteNet_S(nn.Module):
         features = features.div(features_norm.unsqueeze(1))
         end_points['vote_xyz'] = xyz
         end_points['vote_xyz_stage_1'] = xyz
-        end_points['vote_features'] = features
-        end_points['aligned_features'] = self.align(features).transpose(1,2).contiguous()
+        end_points['vote_features'] = features.transpose(1, 2)
+        end_points['aligned_features'] = self.align(features).transpose(1,2).contiguous()   # [8, 128, 1024]
 
         end_points = self.pnet(xyz, features, end_points)
 

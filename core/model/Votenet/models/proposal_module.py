@@ -78,14 +78,14 @@ class ProposalModule(nn.Module):
     def forward(self, xyz, features, end_points):
         """
         Args:
-            xyz: (B,K,3)
-            features: (B,C,K)
+            xyz: (B,K,3)    [8, 1024, 3]
+            features: (B,C,K)   [8, 256, 1024]
         Returns:
             scores: (B,num_proposal,2+3+NH*2+NS*4) 
         """
         if self.sampling == 'vote_fps':
             # Farthest point sampling (FPS) on votes
-            xyz, features, fps_inds = self.vote_aggregation(xyz, features)
+            xyz, features, fps_inds = self.vote_aggregation(xyz, features)  # [8,256,3], [8, 128, 256]
             sample_inds = fps_inds
         elif self.sampling == 'seed_fps': 
             # FPS on seed and choose the votes corresponding to the seeds
@@ -108,7 +108,7 @@ class ProposalModule(nn.Module):
         # --------- PROPOSAL GENERATION ---------
         net = F.relu(self.bn1(self.conv1(features))) 
         net = F.relu(self.bn2(self.conv2(net))) 
-        end_points['penultimate_features'] = net.permute(0, 2, 1)
+        end_points['penultimate_features'] = net.permute(0, 2, 1)   # [8, 256, 128]
         # print(features.mean(), features.std(), '<< features std and mean, validation', flush=True)
         net = self.conv3(net) # (batch_size, 2+3+num_heading_bin*2+num_size_cluster*4, num_proposal)
 

@@ -116,7 +116,7 @@ class VoteNet(nn.Module):
         end_points['vote_xyz'] = xyz
         end_points['vote_features'] = features
 
-        end_points = self.pnet(xyz, features, end_points)
+        end_points = self.pnet(xyz, features, end_points)   # features [8, 1024, 3]
 
         output_dict = self.refine_module(end_points['aggregated_vote_xyz'], end_points['penultimate_features'], end_points)
         end_points = decode_scores(output_dict, end_points, self.num_class, self.num_heading_bin, self.num_size_cluster, self.mean_size_arr, self.center_with_bias, quality_channel=self.quality_channel)

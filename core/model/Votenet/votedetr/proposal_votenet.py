@@ -36,6 +36,7 @@ def decode_scores(output_dict, end_points,  num_class, num_heading_bin, num_size
     end_points = decode_scores_classes(output_dict, end_points, num_class)
     end_points = decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_cluster, mean_size_arr, center_with_bias, quality_channel)
     end_points['refined_vote_feature'] = output_dict['refined_vote_feature']
+    end_points['aligned_refined_vote_feature'] = output_dict['aligned_refined_vote_feature']
     return end_points
 
 

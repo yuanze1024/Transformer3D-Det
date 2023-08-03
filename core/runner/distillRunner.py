@@ -110,12 +110,12 @@ def get_valid_vote_mask(vote_xyz, gt_box_center, gt_box_size):
     # mask_bool1 = (mask >= 0.67) & (mask <= 1)    #表示1~1.5倍检测框尺寸的点
     # return mask_normalized, 100 * torch.sum(mask_normalized > 0) / (B * N * O * 3)
 
-def compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature, vote_mask):
+def compute_vote_distill_loss(refined_vote_xyz, aligned_refined_vote_features, vote_xyz, vote_feature, vote_mask):
     """
     refined_vote_xyz: [B, N, 3]
-    refined_vote_features: [B, N, 288]
+    aligned_refined_vote_features:  [B, N, C] [8, 256, 128]
     vote_xyz: [B, M, 3]
-    aligned_vote_feature: [B, M, 288]
+    vote_feature: [B, M, 128]   [8, 1024, 128]
     vote_mask: [B, N]
 
     regard the refined_vote_xyz as the ground truth, find the nearest refined_vote for each vote_xyz,
@@ -123,19 +123,19 @@ def compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz,
     """
     global VOTE_DISTILL_WEIGHT
     B, N, _ = refined_vote_xyz.shape
-    _, M, C = aligned_vote_feature.shape
+    _, M, C = vote_feature.shape
     vote_xyz = vote_xyz.unsqueeze(2).repeat(1, 1, N, 1) # [B, M, N, 3]
     refined_vote_xyz = refined_vote_xyz.unsqueeze(1).repeat(1, M, 1, 1) # [B, M, N, 3]
     dist = torch.abs(vote_xyz - refined_vote_xyz)   # [B, M, N, 3]
     dist = torch.sum(dist ** 2, dim=-1)   # [B, M, N]
     min_dist_index = torch.argmin(dist, dim=-1) # [B, M]，每个vote对应一个距离其最近的refined_vote
-
+    
     # refined_vote_features的维度是[B, N, C]，在refined_vote_features上索引[B, M], 得到每个点对应的feature[B, M, C]
-    corresponding_features = torch.stack([refined_vote_features[i, min_dist_index[i]] for i in range(refined_vote_features.shape[0])])
+    corresponding_features = torch.stack([aligned_refined_vote_features[i, min_dist_index[i]] for i in range(aligned_refined_vote_features.shape[0])])
     # 每个vote对应一个refined_vote，这个refined_vote对应的mask权重，再repeat C次得到[B, M, C]
     corresponding_mask = torch.gather(vote_mask, 1, min_dist_index).unsqueeze(-1).repeat(1, 1, C)
     # 计算
-    distill_loss = torch.sum(((aligned_vote_feature - corresponding_features) * corresponding_mask) ** 2) / (B * M * C)
+    distill_loss = torch.sum(((vote_feature - corresponding_features) * corresponding_mask) ** 2) / (B * M * C)
     return distill_loss
     # vote_mask_index = torch.argmax(vote_mask.half(), dim=1)  # [B]
     # valid_points = refined_vote_xyz[torch.arange(vote_mask_index.shape[0]), vote_mask_index, :]
@@ -210,9 +210,11 @@ def distillRunner(info):
         # 'aggregated_vote_xyz', 'aggregated_vote_features', 'aggregated_vote_inds'
         refined_vote_xyz = output_t['aggregated_vote_xyz']
         refined_vote_features = output_t['refined_vote_feature']
+        aligned_refined_vote_features = output_t['aligned_refined_vote_feature']    # [8, 128, 256]
         output = model(input, output_t)  # also could backward inside
         vote_xyz = output['vote_xyz']
-        aligned_vote_feature = output['aligned_features']
+        aligned_vote_feature = output['aligned_features']   # [8, 1024, 288]
+        vote_feature = output['vote_features']  # [8, 128, 1024]
         t_forward = time.time()
         if isinstance(model, torch.nn.DataParallel):
             # mutli-batch; for data-parallel-model use
@@ -229,7 +231,7 @@ def distillRunner(info):
         # loss += output['seed_distill_loss']
         output['percent_not_loss'] = percent1
         # output['percent_not_loss2'] = percent2
-        output['vote_distill_loss'] = compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature, vote_mask)
+        output['vote_distill_loss'] = compute_vote_distill_loss(refined_vote_xyz, aligned_refined_vote_features, vote_xyz, vote_feature, vote_mask)
         loss += output['vote_distill_loss']
         # print(loss)
         loss.backward()

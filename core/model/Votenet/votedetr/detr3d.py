@@ -20,7 +20,7 @@ from position_encoding import build_position_encoding
 
 class DETR3D(nn.Module):  # just as a backbone; encoding afterward
     """ This is the DETR module that performs object detection """
-    def __init__(self, config_transformer, input_channels, class_output_shape, bbox_output_shape, aux_loss=False):  # new: from config_transformer
+    def __init__(self, config_transformer, input_channels, class_output_shape, bbox_output_shape, scale_factor=2, aux_loss=False):  # new: from config_transformer
         """ Initializes the model.
         Parameters:
             transformer: torch module of the transformer architecture. See transformer.py
@@ -68,6 +68,9 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         else:
             self.pos_embd = build_position_encoding(config_transformer.position_embedding, hidden_dim, config_transformer.input_dim)
         self.aux_loss = aux_loss
+        
+        self.scale_factor = scale_factor
+        self.align = nn.Conv1d(288, 256//scale_factor, 1)
 
     def forward(self, xyz, features, output, seed_xyz=None, seed_features=None, decode_vars=None):  # insert into output
         """ The forward expects a Dict, which consists of:
@@ -166,6 +169,7 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         else:
             output = {'pred_logits': outputs_class, 'pred_boxes': outputs_coord}  # final
         output['refined_vote_feature'] = hs[-1] # [8, 256, 288]
+        output['aligned_refined_vote_feature'] = self.align(hs[-1].permute(0, 2, 1)).permute(0, 2, 1)    # [8, 256, 288]->[8, 288,256]->[8, 128, 256]
         return output
 
     # @torch.jit.unused
