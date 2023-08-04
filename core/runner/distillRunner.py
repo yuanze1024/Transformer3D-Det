@@ -66,10 +66,10 @@ def get_valid_vote_mask(vote_xyz, gt_box_center, gt_box_size):
     gt_box_center = gt_box_center.unsqueeze(1).repeat(1, N, 1, 1)  # [B, N, O, 3]
     gt_box_size = gt_box_size.unsqueeze(1).repeat(1, N, 1, 1)   # [B, N, O, 3]
     dist_ratio = torch.abs(vote_xyz - gt_box_center) / (gt_box_size / 2 + 1e-7) # [B, N, O, 3]
-    mask = 1 - torch.sum(dist_ratio**2, dim=-1)   # [B, N, O]
+    mask = 1.0 / (1 + torch.sum(dist_ratio**2, dim=-1))   # [B, N, O]
     mask, _ = torch.max(mask, dim=-1)   # [B, N]，得到每个refined_vote在O个目标框中最靠近gt_center的
-    mask = mask * (mask >= 0).float()   # 将比例平方和大于1的点mask置为0
-    percent = torch.sum(mask > 0) / (B * N) # 每个refined_vote落在检测框中（内接椭球）的比例。
+    # mask = mask * (mask >= 0).float()   # 将比例平方和大于1的点mask置为0
+    percent = torch.sum(mask >= 0.5) / (B * N) # 每个refined_vote落在检测框中（内接椭球）的比例。
     return mask, percent
 
     # mask = torch.abs(vote_xyz - gt_box_center) < gt_box_size.unsqueeze(1).repeat(1, N, 1, 1) / 2  # [B, N, O, 3]
@@ -110,7 +110,7 @@ def get_valid_vote_mask(vote_xyz, gt_box_center, gt_box_size):
     # mask_bool1 = (mask >= 0.67) & (mask <= 1)    #表示1~1.5倍检测框尺寸的点
     # return mask_normalized, 100 * torch.sum(mask_normalized > 0) / (B * N * O * 3)
 
-def compute_vote_distill_loss(refined_vote_xyz, aligned_refined_vote_features, vote_xyz, vote_feature, vote_mask):
+def compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature, vote_mask):
     """
     refined_vote_xyz: [B, N, 3]
     aligned_refined_vote_features:  [B, N, C] [8, 256, 128]
@@ -123,7 +123,7 @@ def compute_vote_distill_loss(refined_vote_xyz, aligned_refined_vote_features, v
     """
     global VOTE_DISTILL_WEIGHT
     B, N, _ = refined_vote_xyz.shape
-    _, M, C = vote_feature.shape
+    _, M, C = aligned_vote_feature.shape
     vote_xyz = vote_xyz.unsqueeze(2).repeat(1, 1, N, 1) # [B, M, N, 3]
     refined_vote_xyz = refined_vote_xyz.unsqueeze(1).repeat(1, M, 1, 1) # [B, M, N, 3]
     dist = torch.abs(vote_xyz - refined_vote_xyz)   # [B, M, N, 3]
@@ -131,11 +131,11 @@ def compute_vote_distill_loss(refined_vote_xyz, aligned_refined_vote_features, v
     min_dist_index = torch.argmin(dist, dim=-1) # [B, M]，每个vote对应一个距离其最近的refined_vote
     
     # refined_vote_features的维度是[B, N, C]，在refined_vote_features上索引[B, M], 得到每个点对应的feature[B, M, C]
-    corresponding_features = torch.stack([aligned_refined_vote_features[i, min_dist_index[i]] for i in range(aligned_refined_vote_features.shape[0])])
+    corresponding_features = torch.stack([refined_vote_features[i, min_dist_index[i]] for i in range(refined_vote_features.shape[0])])
     # 每个vote对应一个refined_vote，这个refined_vote对应的mask权重，再repeat C次得到[B, M, C]
     corresponding_mask = torch.gather(vote_mask, 1, min_dist_index).unsqueeze(-1).repeat(1, 1, C)
     # 计算
-    distill_loss = torch.sum(((vote_feature - corresponding_features) * corresponding_mask) ** 2) / (B * M * C)
+    distill_loss = torch.sum(((aligned_vote_feature - corresponding_features) * corresponding_features) ** 2) / (B * M * C)
     return distill_loss
     # vote_mask_index = torch.argmax(vote_mask.half(), dim=1)  # [B]
     # valid_points = refined_vote_xyz[torch.arange(vote_mask_index.shape[0]), vote_mask_index, :]
@@ -260,10 +260,10 @@ def distillRunner(info):
             if iter_id != -1 and (iter_id % config.test_freq == 0 or iter_id % config.save_freq == 0):
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.val_mode()
-                    model_t.module.val_mode()
+                    model_t.net.refine_module.eval()
                 elif isinstance(model, torch.nn.Module):
                     model.val_mode()  # change mode
-                    model_t.val_mode()
+                    model_t.net.refine_module.eval()
                 else:
                     raise NotImplementedError(type(model))
                 output_error = {}
@@ -296,10 +296,10 @@ def distillRunner(info):
                     }, is_best, config.snapshot_save_path + '/ckpt' + '_' + str(iter_id))
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.train_mode()
-                    model_t.module.train_mode()
+                    model_t.module.net.refine_module.train()
                 elif isinstance(model, torch.nn.Module):
                     model.train_mode()  # change mode
-                    model_t.train_mode()
+                    model_t.module.net.refine_module.train()
                 else:
                     raise NotImplementedError(type(model))
         lr_scheduler.step()
