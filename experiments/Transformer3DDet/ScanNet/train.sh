@@ -11,4 +11,4 @@
 source activate pt112
 
 mkdir -p log
-python ../../../algorithm/distill.py
+python ../../../algorithm/distill.py; /usr/bin/shutdown

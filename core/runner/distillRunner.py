@@ -66,9 +66,10 @@ def get_valid_vote_mask(vote_xyz, gt_box_center, gt_box_size):
     gt_box_center = gt_box_center.unsqueeze(1).repeat(1, N, 1, 1)  # [B, N, O, 3]
     gt_box_size = gt_box_size.unsqueeze(1).repeat(1, N, 1, 1)   # [B, N, O, 3]
     dist_ratio = torch.abs(vote_xyz - gt_box_center) / (gt_box_size / 2 + 1e-7) # [B, N, O, 3]
-    mask = 1.0 / (1 + torch.sum(dist_ratio**2, dim=-1))   # [B, N, O]
+    # mask = 1.0 / (1 + torch.sum(dist_ratio**2, dim=-1))   # [B, N, O]
+    mask = 1 - torch.sum(dist_ratio**2, dim=-1)
     mask, _ = torch.max(mask, dim=-1)   # [B, N]，得到每个refined_vote在O个目标框中最靠近gt_center的
-    # mask = mask * (mask >= 0).float()   # 将比例平方和大于1的点mask置为0
+    mask = mask * (mask >= 0).float()   # 将比例平方和大于1的点mask置为0
     percent = torch.sum(mask >= 0.5) / (B * N) # 每个refined_vote落在检测框中（内接椭球）的比例。
     return mask, percent
 
@@ -231,7 +232,7 @@ def distillRunner(info):
         # loss += output['seed_distill_loss']
         output['percent_not_loss'] = percent1
         # output['percent_not_loss2'] = percent2
-        output['vote_distill_loss'] = compute_vote_distill_loss(refined_vote_xyz, aligned_refined_vote_features, vote_xyz, vote_feature, vote_mask)
+        output['vote_distill_loss'] = compute_vote_distill_loss(refined_vote_xyz, refined_vote_features, vote_xyz, aligned_vote_feature, vote_mask)
         loss += output['vote_distill_loss']
         # print(loss)
         loss.backward()
@@ -260,7 +261,7 @@ def distillRunner(info):
             if iter_id != -1 and (iter_id % config.test_freq == 0 or iter_id % config.save_freq == 0):
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.val_mode()
-                    model_t.net.refine_module.eval()
+                    model_t.net.refine_module.train()
                 elif isinstance(model, torch.nn.Module):
                     model.val_mode()  # change mode
                     model_t.net.refine_module.eval()
@@ -296,10 +297,10 @@ def distillRunner(info):
                     }, is_best, config.snapshot_save_path + '/ckpt' + '_' + str(iter_id))
                 if isinstance(model, torch.nn.DataParallel):
                     model.module.train_mode()
-                    model_t.module.net.refine_module.train()
+                    model_t.net.refine_module.train()
                 elif isinstance(model, torch.nn.Module):
                     model.train_mode()  # change mode
-                    model_t.module.net.refine_module.train()
+                    model_t.net.refine_module.train()
                 else:
                     raise NotImplementedError(type(model))
         lr_scheduler.step()
