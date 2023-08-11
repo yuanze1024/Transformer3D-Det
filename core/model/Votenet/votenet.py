@@ -205,7 +205,7 @@ class votenet(base_module):
         print(' ---- metrics_0.50 ---- ')
         for key in metrics_dict_50:
             print('eval %s: %f' % (key, metrics_dict_50[key]), flush=True)
-        return output
+        return output, metrics_dict_25['mAP']
 
 
     def save_dataset(self, dataloader, loggers):

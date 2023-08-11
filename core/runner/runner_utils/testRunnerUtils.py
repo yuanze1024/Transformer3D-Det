@@ -22,7 +22,7 @@ def testmodel(model, loader, loggers, test_freq, testset_name, last_iter):  # la
         with torch.no_grad():  # no tracking
             output = model(sample)
             if it == len(loader) - 1 and hasattr(model, 'final_error'):
-                output = model.final_error(sample, output)
+                output, mAP25 = model.final_error(sample, output)
             # mutli-batch; for data-parallel-model use
             if isinstance(model, torch.nn.DataParallel):
                 for key, value in output.items():
@@ -40,4 +40,4 @@ def testmodel(model, loader, loggers, test_freq, testset_name, last_iter):  # la
             all_error += output['error']
             n_count += output['n_count']
     # print('testing one dataset : DONE', all_error / n_count)
-    return all_error / n_count, 1.
+    return all_error / n_count, 1., mAP25
